@@ -9,7 +9,7 @@
 
 -module(chat_server).
 -import(lib_chan_mm, [send/2, controller/2]).
--import(lists, [delete/2, foreach/2, map/2, member/2,reverse/2]).
+-import(lists, [delete/2, foreach/2, map/2, member/2,reverse/2,keyfind/3]).
 
 -compile(export_all).
 
@@ -46,6 +46,20 @@ server_loop(L) ->
 	{'EXIT', Pid, allGone} ->
 	    L1 = remove_group(Pid, L),
 	    server_loop(L1);
+	list_groups ->
+		io:format("Listing all the groups:~n"),
+		foreach(fun({Group, _}) -> io:format("~s~n", [Group]) end, L),
+		server_loop(L);
+	{list_people, Group} ->
+		io:format("Listing all people in group ~p~n:", [Group]),
+		case lookup(Group, L) of
+		{ok, Pid} ->
+		    Pid ! {list_people},
+		    server_loop(L);
+		error ->
+			io:format("No such groups here~n"),
+		    server_loop(L)
+	    end;
 	Msg ->
 	    io:format("Server received Msg=~p~n",
 		      [Msg]),

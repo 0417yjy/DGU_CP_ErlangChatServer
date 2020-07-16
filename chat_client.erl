@@ -10,7 +10,7 @@
 
 -import(io_widget, 
 	[get_state/1, insert_str/2, set_prompt/2, set_state/2, 
-	 set_title/2, set_handler/2, update_state/3]).
+	 set_title/2, set_handler/2, update_state/3, update_userlist/2]).
 
 -export([start/0, test/0, connect/5]).
 
@@ -23,7 +23,9 @@ test() ->
     connect("localhost", 2223, "AsDT67aQ", "general", "joe"),
     connect("localhost", 2223, "AsDT67aQ", "general", "jane"),
     connect("localhost", 2223, "AsDT67aQ", "general", "jim"),
-    connect("localhost", 2223, "AsDT67aQ", "general", "sue").
+	connect("localhost", 2223, "AsDT67aQ", "general", "sue"),
+	connect("localhost", 2223, "AsDT67aQ", "general2", "joe"),
+	connect("localhost", 2223, "AsDT67aQ", "general2", "jane").
 	   
 
 connect(Host, Port, HostPsw, Group, Nick) ->
@@ -71,10 +73,16 @@ wait_login_response(Widget, MM) ->
 
 
 active(Widget, MM) ->
-     receive
-	 {Widget, Nick, Str} ->
-	     lib_chan_mm:send(MM, {relay, Nick, Str}),
-	     active(Widget, MM);
+    receive
+	 {Widget, Nick, To, Str} ->
+		 case string:equal(To, "All") of
+			 true ->
+				 lib_chan_mm:send(MM, {relay, Nick, Str}),
+				 active(Widget, MM);
+			 false -> % else
+				 lib_chan_mm:send(MM, {whisper, Nick, To, Str}),
+				 active(Widget, MM)
+		 end;
 	 {chan, MM, {msg, From, Pid, Str}} ->
 	     insert_str(Widget, [From,"@",pid_to_list(Pid)," ", Str, "\n"]),
 	     active(Widget, MM);
@@ -82,6 +90,9 @@ active(Widget, MM) ->
 	     lib_chan_mm:close(MM);
 	 {close, MM} ->
 	     exit(serverDied);
+	 {chan, MM, {update, L}} ->
+		update_userlist(Widget, L),
+		active(Widget, MM);
 	 Other ->
 	     io:format("chat_client active unexpected:~p~n",[Other]),
 	     active(Widget, MM)
